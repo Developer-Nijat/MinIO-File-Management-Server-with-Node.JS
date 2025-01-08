@@ -131,7 +131,7 @@ The server will run at [http://localhost:3000](http://localhost:3000).
   }
   ```
 
-## Project Structure
+## API Project Structure
 
 ```
 .
@@ -139,6 +139,15 @@ The server will run at [http://localhost:3000](http://localhost:3000).
 ├── package.json     # Dependencies and scripts
 ├── .env             # Environment variables (create this file)
 └── README.md        # Documentation
+```
+
+## SERVER Project Structure
+
+```
+.
+├── /data            # Stored files
+├── package.json     # Dependencies and scripts
+├── minio.exe        # Main server file
 ```
 
 ## Notes
