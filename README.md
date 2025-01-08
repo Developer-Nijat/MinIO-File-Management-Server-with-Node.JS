@@ -1,4 +1,3 @@
-```markdown
 # MinIO File Management Server with Node.js
 
 A simple file management server built with Node.js and MinIO, providing APIs to upload, list, search, read, and delete files.
@@ -150,4 +149,3 @@ The server will run at [http://localhost:3000](http://localhost:3000).
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-```
