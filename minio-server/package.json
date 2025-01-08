@@ -1,0 +1,13 @@
+{
+  "name": "minio-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "minio server C:/Nijat/1.Projects/Backend/NodeJS/minio-file-management/minio-server/data",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
