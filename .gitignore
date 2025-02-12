@@ -9,3 +9,4 @@ package-lock.json
 mybucket
 
 *.exe
+.vscode/settings.json

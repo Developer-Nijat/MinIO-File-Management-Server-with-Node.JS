@@ -1,145 +1,94 @@
 # MinIO File Management Server with Node.js
 
-A simple file management server built with Node.js and MinIO, providing APIs to upload, list, search, read, and delete files.
+This API provides file management functionalities using MinIO for object storage. It includes file upload, retrieval, listing, and deletion, supporting single and multiple file uploads, including base64-encoded files.
 
 ## Features
-
-- **File Upload**: Upload files with optional categorization.
-- **File Listing**: List files in a bucket with optional prefix filtering.
-- **File Search**: Search files by keyword.
-- **File Download**: Retrieve files from the server.
-- **File Deletion**: Delete specific files.
+- Upload single, multiple, or base64-encoded files
+- List files with pagination and search filters
+- Retrieve files by ID
+- Delete files by ID
+- MinIO object storage integration
 
 ## Prerequisites
-
-1. **Node.js**: Ensure you have Node.js installed. You can download it from [Node.js](https://nodejs.org/).
-2. **MinIO Server**: Set up a MinIO server. Follow the instructions [here](https://min.io/open-source/download?platform=windows).
+- Node.js installed
+- MinIO server set up and running
+- `.env` file with the following values:
+  ```
+  MINIO_ENDPOINT=<your-minio-endpoint>
+  MINIO_ACCESS_KEY=<your-access-key>
+  MINIO_SECRET_KEY=<your-secret-key>
+  MINIO_BUCKET=<your-bucket-name>
+  ```
 
 ## Installation
-
 1. Clone the repository:
-
-   ```bash
+   ```sh
    git clone https://github.com/Developer-Nijat/MinIO-File-Management-Server-with-Node.JS.git
    cd MinIO-File-Management-Server-with-Node.JS
    ```
-
 2. Install dependencies:
-
-   ```bash
+   ```sh
    npm install
    ```
-
-3. Create a `.env` file in the project root with the following variables:
-
-   ```env
-   MINIO_ENDPOINT=your-minio-endpoint
-   MINIO_PORT=9000
-   MINIO_USE_SSL=false
-   MINIO_ACCESS_KEY=your-access-key
-   MINIO_SECRET_KEY=your-secret-key
-   MINIO_BUCKET=your-bucket-name
+3. Run the server:
+   ```sh
+   npm start
    ```
 
-4. Ensure the specified bucket exists in your MinIO server. The server will create it if it doesn't exist.
-
-## Running the Server
-
-Start the server:
-
-```bash
-node server.js
-```
-
-The server will run at [http://localhost:3000](http://localhost:3000).
-
 ## API Endpoints
+### File Upload
+- **Upload a single file**
+  ```http
+  POST /upload
+  ```
+  **Body:** `multipart/form-data`
+  - `file` (required): The file to be uploaded
+  - `category` (optional): Category for the file
 
-### Upload File
+- **Upload multiple files**
+  ```http
+  POST /upload/multiple
+  ```
+  **Body:** `multipart/form-data`
+  - `files` (required): Multiple files to be uploaded (max 10)
+  - `category` (optional): Category for the files
 
-- **Endpoint**: `POST /upload`
-- **Description**: Upload a file with an optional category.
-- **Request**:
-  - Form data: `file` (required), `category` (optional)
-- **Response**:
+- **Upload base64 files**
+  ```http
+  POST /upload/base64
+  ```
+  **Body:** `JSON`
   ```json
   {
-    "message": "File uploaded successfully.",
-    "fileId": "generated-file-id",
-    "objectName": "object-name-in-bucket"
+    "files": [
+      { "filename": "example.txt", "content": "base64-encoded-data", "mimetype": "text/plain" }
+    ],
+    "category": "documents"
   }
   ```
 
----
+### File Retrieval
+- **Get list of files**
+  ```http
+  GET /files?keyword=search&limit=10&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&sortBy=lastModified&sortOrder=desc
+  ```
+  **Query Parameters:**
+  - `keyword` (optional): Search keyword
+  - `limit` (optional): Number of files per page (default: 10)
+  - `startDate`, `endDate` (optional): Date range filter
+  - `sortBy` (optional): Sort field (`filename`, `size`, `category`, `lastModified`)
+  - `sortOrder` (optional): Sort order (`asc`, `desc`)
 
-### List Files
-
-- **Endpoint**: `GET /files`
-- **Query Parameters**:
-  - `prefix` (optional): Filter files by prefix.
-  - `limit` (optional): Limit the number of files returned (default: 10).
-- **Response**:
-  ```json
-  [
-    {
-      "name": "file-name",
-      "size": 12345,
-      "lastModified": "2024-01-01T00:00:00.000Z",
-      "etag": "etag-value"
-    }
-  ]
+- **Get a file by ID**
+  ```http
+  GET /file/:fileId
   ```
 
----
-
-### Search Files
-
-- **Endpoint**: `GET /files/search`
-- **Query Parameters**:
-  - `keyword` (required): Search term for file names.
-  - `prefix` (optional): Filter files by prefix.
-- **Response**:
-  ```json
-  [
-    {
-      "name": "file-name",
-      "size": 12345,
-      "lastModified": "2024-01-01T00:00:00.000Z",
-      "etag": "etag-value"
-    }
-  ]
+### File Deletion
+- **Delete a file by ID**
+  ```http
+  DELETE /file/:fileId
   ```
-
----
-
-### Read File
-
-- **Endpoint**: `GET /file/*`
-- **Description**: Retrieve a file from the server.
-- **Response**: File download.
-
----
-
-### Delete File
-
-- **Endpoint**: `DELETE /file/*`
-- **Description**: Delete a file from the bucket.
-- **Response**:
-  ```json
-  {
-    "message": "File deleted successfully."
-  }
-  ```
-
-## API Project Structure
-
-```
-.
-├── server.js        # Main server file
-├── package.json     # Dependencies and scripts
-├── .env             # Environment variables (create this file)
-└── README.md        # Documentation
-```
 
 ## SERVER Project Structure
 
@@ -155,6 +104,14 @@ The server will run at [http://localhost:3000](http://localhost:3000).
 - Ensure the MinIO server is running and accessible with the credentials provided in the `.env` file.
 - Use tools like Postman or cURL to test the API endpoints.
 
-## License
+## Technologies Used
+- Node.js
+- Express.js
+- MinIO
+- Multer (for file handling)
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+## License
+This project is licensed under the MIT License.
+
+Created by Nijat Aliyev (@developer.nijat)
+
