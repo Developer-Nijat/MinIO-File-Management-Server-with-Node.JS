@@ -8,15 +8,7 @@ const {
 const getFiles = async (req, res) => {
   try {
     const { bucketName } = req.params;
-    const {
-      keyword,
-      limit = 10,
-      marker = "",
-      startDate,
-      endDate,
-      // sortBy = "lastModified",
-      // sortOrder = "desc",
-    } = req.query;
+    const { keyword, limit = 10, marker = "", startDate, endDate } = req.query;
 
     if (!bucketName) {
       return res.status(400).json({ error: "Bucket name is required" });
@@ -57,21 +49,6 @@ const getFiles = async (req, res) => {
       return matches;
     });
 
-    // Sorting logic
-    // filteredFiles.sort((a, b) => {
-    //   let comparison = 0;
-    //   switch (sortBy) {
-    //     case "size":
-    //       comparison = a.size - b.size;
-    //       break;
-    //     case "lastModified":
-    //     default:
-    //       comparison = new Date(a.lastModified) - new Date(b.lastModified);
-    //       break;
-    //   }
-    //   return sortOrder === "desc" ? -comparison : comparison;
-    // });
-
     // Apply pagination
     const paginatedFiles = filteredFiles.slice(0, parsedLimit);
 
@@ -90,8 +67,6 @@ const getFiles = async (req, res) => {
         endDate,
         bucketName,
         limit: parsedLimit,
-        // sortBy,
-        // sortOrder,
       },
     });
   } catch (error) {
@@ -117,11 +92,6 @@ const getFileById = async (req, res) => {
 
     // Set appropriate headers
     res.setHeader("Content-Type", "application/octet-stream");
-    // res.setHeader(
-    //   "Content-Disposition",
-    //   `attachment; filename="${path.basename(obj.name)}"`
-    // );
-
     stream.pipe(res);
   } catch (error) {
     console.error("Error fetching file: ", error);
@@ -207,6 +177,10 @@ const uploadFile = async (req, res) => {
 const uploadBase64Files = async (req, res) => {
   try {
     const { files, bucketName } = req.body;
+
+    if (!bucketName) {
+      return res.status(400).json({ error: "Bucket name is required" });
+    }
 
     if (!Array.isArray(files)) {
       return res

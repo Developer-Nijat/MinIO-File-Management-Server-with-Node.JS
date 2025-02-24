@@ -15,7 +15,7 @@ const app = express();
 const PORT = 3000;
 
 // Middleware
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // MinIO Client Setup
@@ -41,7 +41,7 @@ app.delete("/:bucketName/file/:fileId", deleteFileById);
 
 // Not Found Route
 app.use((req, res) => {
-  res.status(404).send("Not Found");
+  res.status(404).send("API Not Found");
 });
 
 // Start Server
