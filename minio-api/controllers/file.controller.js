@@ -1,110 +1,86 @@
-const path = require("path");
-const {
-  listObjects,
-  findObjectByFileId,
-  uploadToMinio,
-} = require("../utils/helpers");
-const { minioClient, bucketName } = require("../utils/minioClientSetup");
+const { listObjects, uploadToMinio } = require("../utils/helpers");
+const { minioClient } = require("../utils/minioClientSetup");
 const {
   validateBase64Upload,
-  validateQueryParams,
   validateFileUpload,
 } = require("../utils/validators");
 
 const getFiles = async (req, res) => {
   try {
+    const { bucketName } = req.params;
     const {
       keyword,
-      prefix = "",
       limit = 10,
       marker = "",
       startDate,
       endDate,
-      sortBy = "lastModified", // default sort field
-      sortOrder = "desc", // default sort order
+      // sortBy = "lastModified",
+      // sortOrder = "desc",
     } = req.query;
 
-    // Validate query parameters
-    const validationErrors = validateQueryParams(req.query);
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        error: "Invalid query parameters",
-        details: validationErrors,
-      });
+    if (!bucketName) {
+      return res.status(400).json({ error: "Bucket name is required" });
     }
 
-    // Get files list with a larger limit for filtering
+    const normalizedBucketName = bucketName.toLowerCase();
     const parsedLimit = parseInt(limit, 10);
-    const files = await listObjects(
-      prefix,
-      keyword || startDate || endDate ? parsedLimit * 2 : parsedLimit,
-      marker
-    );
 
-    // Apply filters if any filter parameter is provided
-    let filteredFiles = files;
-    if (keyword || startDate || endDate) {
-      filteredFiles = files.filter((file) => {
-        let matches = true;
+    // Fetch objects from Minio
+    const files = await listObjects(normalizedBucketName, parsedLimit, marker);
 
-        // Keyword filter
-        if (keyword) {
-          const searchString =
-            `${file.objectName} ${file.category}`.toLowerCase();
-          matches = matches && searchString.includes(keyword.toLowerCase());
-        }
+    // Apply filtering based on fileId, date range, etc.
+    let filteredFiles = files.filter((file) => {
+      let matches = true;
 
-        // Date range filter
-        if (matches && (startDate || endDate)) {
-          const fileDate = new Date(file.lastModified);
-
-          if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            matches = matches && fileDate >= start;
-          }
-
-          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            matches = matches && fileDate <= end;
-          }
-        }
-
-        return matches;
-      });
-    }
-
-    // Sort files
-    filteredFiles.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "filename":
-          comparison = a.filename.localeCompare(b.filename);
-          break;
-        case "size":
-          comparison = a.size - b.size;
-          break;
-        case "category":
-          comparison = a.category.localeCompare(b.category);
-          break;
-        case "lastModified":
-        default:
-          comparison = new Date(a.lastModified) - new Date(b.lastModified);
-          break;
+      // Keyword filter (matching fileId)
+      if (keyword) {
+        matches = file.fileId.includes(keyword);
       }
-      return sortOrder === "desc" ? -comparison : comparison;
+
+      // Date range filter
+      if (matches && (startDate || endDate)) {
+        const fileDate = new Date(file.lastModified);
+
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          matches = matches && fileDate >= start;
+        }
+
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matches = matches && fileDate <= end;
+        }
+      }
+
+      return matches;
     });
+
+    // Sorting logic
+    // filteredFiles.sort((a, b) => {
+    //   let comparison = 0;
+    //   switch (sortBy) {
+    //     case "size":
+    //       comparison = a.size - b.size;
+    //       break;
+    //     case "lastModified":
+    //     default:
+    //       comparison = new Date(a.lastModified) - new Date(b.lastModified);
+    //       break;
+    //   }
+    //   return sortOrder === "desc" ? -comparison : comparison;
+    // });
 
     // Apply pagination
     const paginatedFiles = filteredFiles.slice(0, parsedLimit);
 
     // Prepare response
-    const response = {
+    res.json({
       files: paginatedFiles,
       nextMarker:
         paginatedFiles.length === parsedLimit
-          ? paginatedFiles[paginatedFiles.length - 1].objectName
+          ? paginatedFiles[paginatedFiles.length - 1].fileId
           : null,
       hasMore: paginatedFiles.length === parsedLimit,
       totalFound: filteredFiles.length,
@@ -112,73 +88,94 @@ const getFiles = async (req, res) => {
         keyword,
         startDate,
         endDate,
-        prefix,
+        bucketName,
         limit: parsedLimit,
-        sortBy,
-        sortOrder,
+        // sortBy,
+        // sortOrder,
       },
-    };
-
-    res.json(response);
-  } catch (error) {
-    console.error("Error processing files request: ", error);
-    res.status(500).json({
-      error: "Error processing files request",
-      message: error.message,
     });
+  } catch (error) {
+    console.error("Error fetching files:", error);
+    res
+      .status(500)
+      .json({ error: "Error fetching files", message: error.message });
   }
 };
 
 const getFileById = async (req, res) => {
   try {
-    const { fileId } = req.params;
-    const obj = await findObjectByFileId(fileId);
+    const { fileId, bucketName } = req.params;
 
-    if (!obj) {
-      return res.status(404).send("File not found");
+    if (!bucketName || !fileId) {
+      return res
+        .status(400)
+        .json({ error: "Bucket name and file ID is required" });
     }
 
-    const stream = await minioClient.getObject(bucketName, obj.name);
+    const normalizedBucketName = bucketName.toLowerCase();
+    const stream = await minioClient.getObject(normalizedBucketName, fileId);
 
     // Set appropriate headers
     res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${path.basename(obj.name)}"`
-    );
+    // res.setHeader(
+    //   "Content-Disposition",
+    //   `attachment; filename="${path.basename(obj.name)}"`
+    // );
 
     stream.pipe(res);
   } catch (error) {
     console.error("Error fetching file: ", error);
-    res.status(500).send("Error reading file: " + error.message);
+
+    if (error?.code && error.code.toLowerCase() === "nosuchkey") {
+      res.status(404).json({ error: "File not found" });
+    } else {
+      res
+        .status(500)
+        .json({ error: "Error fetching file", message: error.message });
+    }
   }
 };
 
 const deleteFileById = async (req, res) => {
   try {
-    const { fileId } = req.params;
-    const obj = await findObjectByFileId(fileId);
+    const { fileId, bucketName } = req.params;
 
-    if (!obj) {
-      return res.status(404).send("File not found");
+    if (!bucketName || !fileId) {
+      return res
+        .status(400)
+        .json({ error: "Bucket name and file ID is required" });
     }
+    const normalizedBucketName = bucketName.toLowerCase();
 
-    await minioClient.removeObject(bucketName, obj.name);
+    await minioClient.removeObject(normalizedBucketName, fileId);
+
     res.json({
       message: "File deleted successfully.",
       fileId,
-      objectName: obj.name,
+      bucketName: normalizedBucketName,
     });
   } catch (error) {
     console.error("Error deleting file: ", error);
-    res.status(500).send("Error deleting file: " + error.message);
+
+    if (error?.code && error.code.toLowerCase === "nosuchkey") {
+      res.status(404).json({ error: "File not found" });
+    } else {
+      res.status(500).json({
+        error: "Error deleting file",
+        message: error.message,
+      });
+    }
   }
 };
 
 const uploadFile = async (req, res) => {
   try {
-    const { category } = req.body;
+    const { bucketName } = req.body;
     const file = req.file;
+
+    if (!bucketName) {
+      return res.status(400).json({ error: "Bucket name is required" });
+    }
 
     const validationErrors = validateFileUpload(file);
     if (validationErrors.length > 0) {
@@ -191,7 +188,7 @@ const uploadFile = async (req, res) => {
         filename: file.originalname,
         mimetype: file.mimetype,
       },
-      category
+      bucketName
     );
 
     res.status(201).json({
@@ -209,7 +206,7 @@ const uploadFile = async (req, res) => {
 
 const uploadBase64Files = async (req, res) => {
   try {
-    const { files, category } = req.body;
+    const { files, bucketName } = req.body;
 
     if (!Array.isArray(files)) {
       return res
@@ -242,7 +239,7 @@ const uploadBase64Files = async (req, res) => {
               filename: fileData.filename,
               mimetype,
             },
-            category
+            bucketName
           );
 
           results.push({
@@ -276,7 +273,7 @@ const uploadBase64Files = async (req, res) => {
 
 const uploadMultipleFiles = async (req, res) => {
   try {
-    const { category } = req.body;
+    const { bucketName } = req.body;
     const files = req.files;
 
     if (!files || files.length === 0) {
@@ -305,7 +302,7 @@ const uploadMultipleFiles = async (req, res) => {
               filename: file.originalname,
               mimetype: file.mimetype,
             },
-            category
+            bucketName
           );
 
           results.push({

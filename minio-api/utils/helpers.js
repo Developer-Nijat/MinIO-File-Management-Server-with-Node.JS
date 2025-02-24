@@ -1,15 +1,18 @@
 const { v4: uuidv4 } = require("uuid");
-const { minioClient, bucketName } = require("./minioClientSetup");
+const {
+  minioClient,
+  bucketName,
+  ensureBucketExists,
+} = require("./minioClientSetup");
 
-async function listObjects(prefix = "", limit = 10, marker = "") {
-  const stream = minioClient.listObjects(bucketName, prefix, true);
+async function listObjects(bucketName, limit = 10, marker = "") {
+  const stream = minioClient.listObjects(bucketName, "", true);
   const files = [];
   let count = 0;
   let startFromMarker = !marker;
 
   return new Promise((resolve, reject) => {
     stream.on("data", (obj) => {
-      // If marker is provided, skip until we find it
       if (!startFromMarker) {
         if (obj.name === marker) {
           startFromMarker = true;
@@ -18,19 +21,14 @@ async function listObjects(prefix = "", limit = 10, marker = "") {
       }
 
       if (count < limit) {
-        const fileInfo = extractFileInfo(obj.name);
-        if (fileInfo) {
-          files.push({
-            objectName: obj.name,
-            size: obj.size,
-            lastModified: obj.lastModified,
-            etag: obj.etag,
-            fileId: fileInfo.fileId,
-            filename: fileInfo.filename,
-            category: fileInfo.category,
-          });
-          count++;
-        }
+        const fileId = obj.name.split("/").pop(); // Extract fileId from path
+        files.push({
+          fileId,
+          size: obj.size,
+          lastModified: obj.lastModified,
+          etag: obj.etag,
+        });
+        count++;
       }
     });
 
@@ -80,27 +78,26 @@ function extractFileInfo(objectName) {
   };
 }
 
-const uploadToMinio = async (fileData, category = "default") => {
+const uploadToMinio = async (fileData, bucketName = "mybucket") => {
+  const normalizedBucketName = bucketName.toLowerCase();
+  await ensureBucketExists(normalizedBucketName);
+
   const fileId = uuidv4();
-  const objectName = `${category}/${fileId}-${fileData.filename}`;
 
   await minioClient.putObject(
-    bucketName,
-    objectName,
+    normalizedBucketName,
+    fileId,
     fileData.buffer,
     fileData.buffer.length,
     {
       "Content-Type": fileData.mimetype,
-      "x-amz-meta-fileid": fileId,
       "x-amz-meta-filename": fileData.filename,
-      "x-amz-meta-category": category,
     }
   );
 
   return {
     fileId,
-    objectName,
-    category,
+    bucketName: normalizedBucketName,
     size: fileData.buffer.length,
     mimetype: fileData.mimetype,
   };

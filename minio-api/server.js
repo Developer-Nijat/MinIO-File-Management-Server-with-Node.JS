@@ -10,7 +10,6 @@ const {
   uploadMultipleFiles,
   uploadBase64Files,
 } = require("./controllers/file.controller");
-const { minioClient, bucketName } = require("./utils/minioClientSetup");
 
 const app = express();
 const PORT = 3000;
@@ -22,26 +21,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // MinIO Client Setup
 require("./utils/minioClientSetup");
 
-// Helper function to ensure bucket exists
-async function ensureBucketExists() {
-  try {
-    const exists = await minioClient.bucketExists(bucketName);
-    if (!exists) {
-      await minioClient.makeBucket(bucketName, "eu-central-1");
-      console.log(`Bucket "${bucketName}" created successfully.`);
-    }
-  } catch (err) {
-    console.error("Error ensuring bucket exists:", err.message);
-    throw err;
-  }
-}
-
 // Multer Setup
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
-// Initialize bucket
-ensureBucketExists().catch(console.error);
 
 // File Upload API'S
 app.post("/upload", upload.single("file"), uploadFile);
@@ -49,13 +31,18 @@ app.post("/upload/multiple", upload.array("files", 10), uploadMultipleFiles); //
 app.post("/upload/base64", uploadBase64Files);
 
 // List Files with pagination and Search Filters
-app.get("/files", getFiles);
+app.get("/:bucketName/files", getFiles);
 
 // Read File by fileId
-app.get("/file/:fileId", getFileById);
+app.get("/:bucketName/file/:fileId", getFileById);
 
 // Delete File by fileId
-app.delete("/file/:fileId", deleteFileById);
+app.delete("/:bucketName/file/:fileId", deleteFileById);
+
+// Not Found Route
+app.use((req, res) => {
+  res.status(404).send("Not Found");
+});
 
 // Start Server
 app.listen(PORT, () => {
